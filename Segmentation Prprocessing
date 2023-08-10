@@ -1,0 +1,111 @@
+import os
+import sys
+import cv2
+import json
+import random
+import imutils
+import warnings
+import PIL.Image
+import numpy as np
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+%matplotlib inline
+
+import imageio
+from skimage.io import imread, imshow
+from skimage.transform import resize
+from sklearn.preprocessing import LabelBinarizer
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+
+# import necessary layers
+from keras.models import Model, load_model, Sequential
+from keras.layers import Input
+from keras.layers.core import Dropout, Lambda
+from keras.layers.convolutional import Conv2D, Conv2DTranspose
+from keras.layers.pooling import MaxPooling2D
+from tensorflow.keras.layers import concatenate
+from keras.callbacks import EarlyStopping, ModelCheckpoint
+from keras import backend as K
+
+import tensorflow as tf
+from tensorflow.keras.layers import Input, Conv2D , Dropout, MaxPool2D, Flatten, Dense, Activation, ZeroPadding2D
+from tensorflow.keras.layers import MaxPooling2D, AveragePooling2D, BatchNormalization, add
+from tensorflow.keras import Model
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.regularizers import l2
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.preprocessing.image import img_to_array
+from tensorflow.keras import backend as K
+from tensorflow.keras.optimizers import Adam
+classes=['fundus','eosho','normal','ulcer']
+path1='/content/drive/MyDrive/gastric_kvasir'
+path = os.path.join(path1, 'masks')
+os.mkdir(path)
+for i in classes:
+  datapath=path+'/'
+  path2=os.path.join(datapath, i)
+  os.mkdir(path2)
+
+
+for root, dirs, files in os.walk("/content/dataset/normal"):
+            for filename in files:
+
+                img = np.asarray(PIL.Image.open('/content/dataset/normal/'+filename))
+                img4 = np.zeros((img.shape[0],img.shape[1]))
+                cv2.imwrite('/content/drive/MyDrive/gastric_kvasir/masks/normal/%s' % filename,img4)
+
+
+with open("/content/fundus.json", "r") as read_file:
+    data = json.load(read_file)
+
+all_file_names=list(data.keys())
+
+
+Files_in_directory = []
+for root, dirs, files in os.walk("/content/dataset/fundus"):
+    for filename in files:
+        Files_in_directory.append(filename)
+
+
+for j in range(len(all_file_names)):
+    #print(all_file_names[j])
+    image_name=data[all_file_names[j]]['filename']
+
+    if image_name in Files_in_directory:
+         img = np.asarray(PIL.Image.open('/content/dataset/fundus/'+image_name))
+
+    else:
+         continue
+
+
+    if data[all_file_names[j]]['regions'] != {}:
+
+        try:
+            shape1_x=data[all_file_names[j]]['regions']['0']['shape_attributes']['all_points_x']
+            shape1_y=data[all_file_names[j]]['regions']['0']['shape_attributes']['all_points_y']
+        except :
+            shape1_x=data[all_file_names[j]]['regions'][0]['shape_attributes']['all_points_x']
+            shape1_y=data[all_file_names[j]]['regions'][0]['shape_attributes']['all_points_y']
+
+        fig = plt.figure()
+
+        plt.imshow(img.astype(np.uint8))
+        plt.scatter(shape1_x,shape1_y,zorder=2,color='red',marker = '.', s= 55)
+
+
+        ab=np.stack((shape1_x, shape1_y), axis=1)
+        img4 = np.zeros((img.shape[0],img.shape[1]))
+
+        mask = np.zeros((img.shape[0],img.shape[1]))
+        img3=cv2.drawContours(mask, [ab.astype(int)], -1, 255, -1)
+        Mask=mask.astype(np.uint8)
+        thresh = 150
+        #get threshold image
+        ret,thresh_img = cv2.threshold(img, thresh, 255, 0)
+
+        contours, hierarchy = cv2.findContours(Mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+        imagename=image_name.replace("jpg", "png")
+
+        cv2.imwrite('/content/drive/MyDrive/gastric_kvasir/masks/fundus/%s' % imagename,mask.astype(np.uint8))
