@@ -1,0 +1,82 @@
+print("[INFO] evaluating...")
+model = load_model(checkpoint_filepath)
+predictions = model.predict(testX, batch_size=32)
+print(classification_report(testY.argmax(axis=1),
+predictions.argmax(axis=1), target_names=classNames))
+
+# @title Default title text
+
+imgs11 = '/content/dataset/fundus/1_0_7245.jpg'
+X_test1 = np.zeros((1, IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS), dtype=np.uint8)
+sizes_test1 = []
+img1 = imread(imgs11)[:,:,:IMG_CHANNELS]
+
+sizes_test1.append([img1.shape[0], img1.shape[1]])
+img1 = resize(img1, (IMG_HEIGHT, IMG_WIDTH), mode='constant', preserve_range=True)
+X_test1[0] = img1
+
+#Predict on train, val and test
+model = load_model('/content/drive/MyDrive/gastric_kvasir/model.h5')
+
+preds_test = model.predict(X_test1, verbose=1)
+img=cv2.imread(imgs11)
+img=cv2.resize(img, (128, 128))
+imgs4=cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+
+gt_image = f'/content/drive/MyDrive/gastric_kvasir/masks/{imgs11.split("/")[-2]}/{imgs11.split("/")[-1][:-4]}.png'
+gtImage=cv2.imread(gt_image)
+gtImage=cv2.resize(gtImage, (128, 128))
+gtImage=cv2.cvtColor(gtImage,cv2.COLOR_BGR2GRAY)
+
+preds_test_upsampled1=[]
+preds_test_t = (preds_test > 0.5).astype(np.uint8)
+preds_test_upsampled1.append(resize(np.squeeze(preds_test_t[0]),  (sizes_test1[0][0], sizes_test1[0][1]), mode='constant',
+       preserve_range=True))
+
+img=np.expand_dims(preds_test_upsampled1[0],axis=-1)
+mask1='testmask.jpg'
+imageio.imwrite(mask1,img)
+
+sp = SimplePreprocessor(64, 64)
+iap = ImageToArrayPreprocessor()
+image = cv2.imread("testmask.jpg")
+data = sp.preprocess(image)
+data = data.astype("float") / 255.0
+data = np.expand_dims(data, axis=0)
+model = tf.keras.models.load_model('/content/drive/MyDrive/gastric_kvasir/classificationModel.h5')
+preds = model.predict(data).argmax()
+classNames = ['eosho', 'fundus', 'normal', 'ulcer']
+
+# Dice similarity function
+def dice(pred, true, k = 1):
+    intersection = np.sum(pred[true==k]) * 2.0
+    dice = intersection / (np.sum(pred) + np.sum(true))
+    if pred.sum() == 0 and true.sum() == 0:
+        return 1.0
+    return dice
+
+dice_score = dice(gtImage, np.squeeze(preds_test_t[0]), k = 1) #255 in my case, can be 1
+
+plt.subplot(131),plt.imshow(imgs4)
+plt.title('Original'), plt.xticks([]), plt.yticks([])
+plt.subplot(132),plt.imshow(gtImage, cmap='gray')
+plt.title('Ground Truth')
+plt.subplot(133),plt.imshow(np.squeeze(preds_test_t[0]), cmap='gray')
+plt.title('Segmented')
+plt.axis('off')
+plt.show()
+print('Classification:', classNames[preds])
+print ("Dice Similarity: {}".format(dice_score))
+
+# Compute the Intersection over Union
+def IoU(true, pred):
+    if pred.sum() == 0 and true.sum() == 0:
+        return 1.0
+    intersection = np.logical_and(true, pred)                                       # Compute Intersection
+    union = np.logical_or(true, np.squeeze(pred))                                   # Compute the Union
+    IoU = np.divide(intersection.sum(), union.sum())
+    return IoU
+
+# Compute Intersection divided by Union
+IoU = IoU(gtImage, np.squeeze(preds_test_t[0]))
+print(f"Intersection over Union is {IoU:.2f}")
