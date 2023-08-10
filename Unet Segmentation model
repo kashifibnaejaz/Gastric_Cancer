@@ -1,0 +1,94 @@
+# Build UNet model
+inputs = Input((IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS))
+chanDim=1
+stride=(1,1)
+reg=0.0001
+bnEps=2e-5
+bnMom=0.9
+K=32
+s = Lambda(lambda x: x / 255) (inputs)
+bn1 = BatchNormalization(axis=chanDim, epsilon=bnEps,
+			momentum=bnMom)(s)
+act1 = Activation("relu")(bn1)
+conv1 = Conv2D(int(K * 0.25), (1, 1), use_bias=False,
+    kernel_regularizer=l2(reg))(act1)
+
+# the second block of the multitaskNet module are the 3x3 CONVs
+K=64
+bn2 = BatchNormalization(axis=chanDim, epsilon=bnEps,
+    momentum=bnMom)(conv1)
+act2 = Activation("relu")(bn2)
+conv2 = Conv2D(int(K * 0.25), (3, 3), strides=stride,
+    padding="same", use_bias=False,
+    kernel_regularizer=l2(reg))(act2)
+
+# the third block of the multitaskNet module is another set of 1x1
+# CONVs
+K=128
+bn3 = BatchNormalization(axis=chanDim, epsilon=bnEps,
+    momentum=bnMom)(conv2)
+act3 = Activation("relu")(bn3)
+conv3 = Conv2D(K, (1, 1), use_bias=False,
+    kernel_regularizer=l2(reg))(act3)
+K=256
+bn4 = BatchNormalization(axis=chanDim, epsilon=bnEps,
+    momentum=bnMom)(conv1)
+act4 = Activation("relu")(bn2)
+conv4 = Conv2D(int(K * 0.25), (3, 3), strides=stride,
+    padding="same", use_bias=False,
+    kernel_regularizer=l2(reg))(act4)
+
+c1 = Conv2D(16, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same') (conv4)
+c1 = Dropout(0.1) (c1)
+c1 = Conv2D(16, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same') (c1)
+p1 = MaxPooling2D((2, 2)) (c1)
+
+c2 = Conv2D(32, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same') (p1)
+c2 = Dropout(0.1) (c2)
+c2 = Conv2D(32, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same') (c2)
+p2 = MaxPooling2D((2, 2)) (c2)
+
+c3 = Conv2D(64, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same') (p2)
+c3 = Dropout(0.2) (c3)
+c3 = Conv2D(64, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same') (c3)
+p3 = MaxPooling2D((2, 2)) (c3)
+
+c4 = Conv2D(128, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same') (p3)
+c4 = Dropout(0.2) (c4)
+c4 = Conv2D(128, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same') (c4)
+p4 = MaxPooling2D(pool_size=(2, 2)) (c4)
+
+c5 = Conv2D(256, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same') (p4)
+c5 = Dropout(0.3) (c5)
+c5 = Conv2D(256, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same') (c5)
+
+u6 = Conv2DTranspose(128, (2, 2), strides=(2, 2), padding='same') (c5)
+u6 = concatenate([u6, c4])
+c6 = Conv2D(128, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same') (u6)
+c6 = Dropout(0.2) (c6)
+c6 = Conv2D(128, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same') (c6)
+
+u7 = Conv2DTranspose(64, (2, 2), strides=(2, 2), padding='same') (c6)
+u7 = concatenate([u7, c3])
+c7 = Conv2D(64, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same') (u7)
+c7 = Dropout(0.2) (c7)
+c7 = Conv2D(64, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same') (c7)
+
+u8 = Conv2DTranspose(32, (2, 2), strides=(2, 2), padding='same') (c7)
+u8 = concatenate([u8, c2])
+c8 = Conv2D(32, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same') (u8)
+c8 = Dropout(0.1) (c8)
+c8 = Conv2D(32, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same') (c8)
+
+u9 = Conv2DTranspose(16, (2, 2), strides=(2, 2), padding='same') (c8)
+u9 = concatenate([u9, c1], axis=3)
+c9 = Conv2D(16, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same') (u9)
+c9 = Dropout(0.1) (c9)
+c9 = Conv2D(16, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same') (c9)
+
+outputs = Conv2D(1, (1, 1), activation='sigmoid') (c9)
+
+model1 = Model(inputs=[inputs], outputs=[outputs])
+model1.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+model1.summary()
+print("The model is defined")
