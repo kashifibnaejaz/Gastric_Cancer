@@ -1,0 +1,14 @@
+# construct the image generator for data augmentation
+aug = ImageDataGenerator(rotation_range=30, width_shift_range=0.1,
+	height_shift_range=0.1, shear_range=0.2, zoom_range=0.2,
+	horizontal_flip=True, fill_mode="nearest")
+
+# Fit model
+earlystopper = EarlyStopping(patience=5, verbose=1)
+
+checkpoint_filepath='/content/drive/MyDrive/gastric_kvasir/model.h5'
+checkpointer = ModelCheckpoint(checkpoint_filepath,monitor='accuracy',verbose=1, save_best_only=True)
+callbacks = [checkpointer]
+(trainX, testX, trainY, testY) = train_test_split(X_train,Y_train,
+test_size=0.25, random_state=42)
+results = model1.fit(aug.flow(trainX, trainY, batch_size=16),callbacks=callbacks, epochs=150)
