@@ -1,0 +1,14 @@
+# compile our model (this needs to be done after our setting our
+# layers to being non-trainable
+model = cnnModel(trainX.shape[1:], trainY.shape[-1])
+print("[INFO] compiling model...")
+opt = Adam(learning_rate=0.001)
+model.compile(loss="categorical_crossentropy", optimizer=opt,
+	metrics=["accuracy"])
+
+checkpoint_filepath='/content/drive/MyDrive/gastric_kvasir/classificationModel.h5'
+checkpointer = ModelCheckpoint(checkpoint_filepath, monitor='val_accuracy',verbose=1, save_best_only=True)
+
+print("[INFO] training network...")
+H = model.fit(trainX, trainY, validation_data=(testX, testY),
+    batch_size=32, epochs=50, verbose=1, callbacks=[checkpointer])
